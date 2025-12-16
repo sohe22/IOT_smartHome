@@ -10,7 +10,7 @@
 
 // ===== Edge Impulse =====
 // [주의] 팀원이 준 라이브러리 이름으로 유지하세요.
-#include <IOT_project_inferencing.h> 
+#include <IoT_project_inferencing.h> 
 #include <PDM.h>
 
 // ================= PINS & CONFIG =================
@@ -25,8 +25,8 @@
 #define RAIN_WET_TH  300  // 300 이하면 비 옴 (Analog값 특성)
 
 // 서보 각도
-#define WINDOW_OPEN_ANG   0   // 각도는 기구물에 맞춰 조정
-#define WINDOW_CLOSE_ANG  90
+#define WINDOW_OPEN_ANG   120   // 각도는 기구물에 맞춰 조정
+#define WINDOW_CLOSE_ANG  70
 
 // ================= OBJECTS =================
 DHT dht(DHTPIN, DHTTYPE);
@@ -62,7 +62,9 @@ static volatile bool bufferReady = false;
 
 void onPDMdata() {
   int bytesAvailable = PDM.available();
-  PDM.read(sampleBuffer, bytesAvailable);
+  // 버퍼 오버플로우 방지
+  int bytesToRead = min(bytesAvailable, (int)(EI_CLASSIFIER_RAW_SAMPLE_COUNT * sizeof(int16_t)));
+  PDM.read(sampleBuffer, bytesToRead);
   bufferReady = true;
 }
 
@@ -208,9 +210,9 @@ void determineAction() {
   // [AUTO 모드] 센서 기반 판단
   if (systemMode == "AUTO") {
     // 1. 창문 로직
-    if (rainValue < RAIN_WET_TH) {
+    if (rainValue >= RAIN_WET_TH) { 
       finalWin = "Closed";
-      reasonList += "비 감지됨 -> 창문 닫기";
+      reasonList += "비 감지됨(값 높음) -> 창문 닫기";
     } else {
       finalWin = "Open";
       reasonList += "날씨 쾌적 -> 창문 열기";
@@ -248,8 +250,8 @@ void determineAction() {
 // ---------------------------------------------------------
 void applyActuation() {
   // 창문 서보
-  if (finalWin == "Open") windowServo.write(WINDOW_OPEN_ANG);
-  else windowServo.write(WINDOW_CLOSE_ANG);
+  if (finalWin == "Open") windowServo.write(WINDOW_OPEN_ANG); // 120도
+  else windowServo.write(WINDOW_CLOSE_ANG); // 70도
 
   // LED 제어 (있다면 추가)
   // if (finalHeat == "ON") digitalWrite(LED_RED, HIGH); ...
